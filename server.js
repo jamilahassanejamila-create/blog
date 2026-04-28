@@ -51,11 +51,7 @@ async function sendEmail(to, subject, html) {
 
 // ====================== MIDDLEWARE ======================
 // ✅ CORS dynamique — ajoute PROD_ORIGIN dans .env pour la production
-const ALLOWED_ORIGINS = [
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-    ...(process.env.PROD_ORIGIN ? [process.env.PROD_ORIGIN] : [])
-];
+const ALLOWED_ORIGINS = ["*"];
 app.use(cors({
     origin: (origin, cb) => {
         if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true);

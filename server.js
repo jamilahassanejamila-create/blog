@@ -21,17 +21,22 @@ const SALT_ROUNDS = 12; // 🔒 12 rounds au lieu de 10 = plus sécurisé
 
 // ====================== EMAIL (Placeholder / Gmail SMTP) ======================
 const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false,
     auth: {
-        user: process.env.EMAIL_USER || 'your-email@gmail.com',
-        pass: process.env.EMAIL_PASS || 'your-app-password'
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+    },
+    tls: {
+        rejectUnauthorized: false
     }
 });
 
 async function sendEmail(to, subject, html) {
     try {
         await transporter.sendMail({
-            from: `"WebMarko CRM" <${process.env.EMAIL_USER || 'noreply@webmarko.ma'}>`,
+            from: `"WebMarko CRM" <${process.env.EMAIL_USER}>`,
             to,
             subject,
             html
@@ -118,10 +123,26 @@ function adminOnly(req, res, next) {
 }
 
 // ====================== MySQL Connection ======================
+// اتصال أولي بدون database لإنشاءها إلا ما كانتش
+const dbInit = mysql.createConnection({
+    host: process.env.DB_HOST || 'localhost',
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASS || '',
+});
+
+dbInit.connect(err => {
+    if (err) { console.error('❌ DB init error:', err.message); process.exit(1); }
+    dbInit.query(`CREATE DATABASE IF NOT EXISTS \`${process.env.DB_NAME || 'webmarko_crm'}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`, (err2) => {
+        if (err2) { console.error('❌ Create DB error:', err2.message); process.exit(1); }
+        console.log('✅ Database prête');
+        dbInit.end();
+    });
+});
+
 const db = mysql.createPool({
     host: process.env.DB_HOST || 'localhost',
     user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASS || '123456789',
+    password: process.env.DB_PASS || '',
     database: process.env.DB_NAME || 'webmarko_crm',
     waitForConnections: true,
     connectionLimit: 10,
@@ -527,19 +548,21 @@ app.post('/reclamations', authMiddleware, async (req, res) => {
 
         await logAction(req.user.id, 'CREATE', 'reclamations', result.insertId, sujet);
 
-        // Notify admin par email si réclamation urgente
-        if (priorite === 'Urgente') {
-            const clientRows = await dbQuery('SELECT * FROM clients WHERE id = ?', [client_id]);
-            const cl = clientRows[0] || {};
-            await sendEmail(
-                process.env.ADMIN_EMAIL || 'admin@marco.com',
-                `🚨 Réclamation URGENTE — ${sujet}`,
-                `<h2>Réclamation urgente reçue</h2>
-                 <p><strong>Client:</strong> ${cl.prenom} ${cl.nom}</p>
-                 <p><strong>Sujet:</strong> ${sujet}</p>
-                 <p><strong>Description:</strong> ${description}</p>`
-            );
-        }
+        // Notify admin par email pour toutes les réclamations
+        const clientRows = await dbQuery('SELECT * FROM clients WHERE id = ?', [client_id]);
+        const cl = clientRows[0] || {};
+        const emoji = priorite === 'Urgente' ? '🚨' : priorite === 'Haute' ? '⚠️' : '📩';
+        await sendEmail(
+            process.env.ADMIN_EMAIL || process.env.EMAIL_USER,
+            `${emoji} Nouvelle Réclamation — ${sujet}`,
+            `<h2>Nouvelle réclamation reçue</h2>
+             <p><strong>Client:</strong> ${cl.prenom || ''} ${cl.nom || ''}</p>
+             <p><strong>Email:</strong> ${cl.email || ''}</p>
+             <p><strong>Sujet:</strong> ${sujet}</p>
+             <p><strong>Type:</strong> ${type || '—'}</p>
+             <p><strong>Priorité:</strong> ${priorite}</p>
+             <p><strong>Description:</strong> ${description}</p>`
+        );
 
         res.json({ id: result.insertId, sujet, description, statut, priorite, client_id, type });
     } catch (err) {

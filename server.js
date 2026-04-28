@@ -915,7 +915,7 @@ app.put('/users/:id/password', authMiddleware, async (req, res) => {
 // ====================== OTHER ======================
 app.get('/test', (req, res) => res.json({ status: 'ok', version: '2.0', auth: 'JWT' }));
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'webmarko-crm.html'));
+    res.send("test kjdhskj")
 });
 
 // ====================== START ======================

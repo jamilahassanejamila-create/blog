@@ -911,7 +911,7 @@ app.put('/users/:id/password', authMiddleware, async (req, res) => {
 // ====================== OTHER ======================
 app.get('/test', (req, res) => res.json({ status: 'ok', version: '2.0', auth: 'JWT' }));
 app.get('/', (req, res) => {
-    res.send("test kjdhskj")
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // ====================== START ======================
